@@ -5,7 +5,7 @@ With this simplistic implementation you can recreate missing features like call 
 
 ### Usage
 Use with a `go:generate` directive:
-```
+```go
 package foo
 
 //go:generate go run github.com/hoenn/minifake ./filename.go InterfaceA,InterfaceB
