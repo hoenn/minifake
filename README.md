@@ -1,7 +1,7 @@
 # `minifake`
-`minifake` is a tool for generating stubbed implementations, or fakes, of interfaces to inject as dependencies during tests that are as light as possible. Other tools like `mockgen` and `counterfeiter` bring in a ton of functionality that is excessive for some projects and can lead to tests that test the mocks.
+`minifake` is a tool for generating stubbed implementations, or fakes, of interfaces to inject as dependencies during tests that are as light as possible. Other tools like `mockgen` and `counterfeiter` bring in a ton of functionality that is excessive for some projects and make much larger generated fakes. `minifake` generates the bare minimum.
 
-With this simplistic implementation you can recreate missing features like call counts or thread safety at the stub level if needed.
+With this simplistic implementation you can recreate missing features like call counts, thread safety, returns for call, etc., in each stub as needed.
 
 ### Usage
 Use with a `go:generate` directive:
@@ -56,7 +56,7 @@ func (f *FakeJobQueuer) Queue() []*Job {
 func TestJobQueuer(t *testing.T) {
 	f := &FakeJobQueuer{
 		EnqueueStub: func(j *Job) error {
-			// Implement behavior you want to mock, like returning
+			// Implement behavior you want to fake, like returning
 			// a specific error.
 		},
 		DequeueStub: func(j *Job) error {
@@ -64,7 +64,7 @@ func TestJobQueuer(t *testing.T) {
 			// dequeueCalled = true
 			// dequeueCalls++
 		},
-        // Undefined QueueStub() panics when called.
+		// Undefined QueueStub() panics when called.
 	}
 	svc := newComplicatedService(fakeJobQueuer)
 	// Expected dequeueCalled to be true
