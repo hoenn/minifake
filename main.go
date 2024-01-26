@@ -6,12 +6,12 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hoenn/ministub/pkg/ministub"
+	"github.com/hoenn/minifake/pkg/minifake"
 )
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println("Usage: ministub <file.go> <interfaceA,interfaceB>")
+		fmt.Println("Usage: minifake <file.go> <interfaceA,interfaceB>")
 		os.Exit(1)
 	}
 
@@ -24,7 +24,7 @@ func main() {
 	for i, n := range interfaceNames {
 		interfaceNames[i] = strings.TrimSpace(n)
 	}
-	bs, err := ministub.ParseAndStubFromFile(interfaceNames, filepath, true)
+	bs, err := minifake.ParseAndStubFromFile(interfaceNames, filepath, true)
 	if err != nil {
 		fmt.Println("Unable to parse and create fake:", err)
 		os.Exit(1)

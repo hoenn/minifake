@@ -1,6 +1,6 @@
 package alltypes
 
-//go:generate go run github.com/hoenn/ministub ./alltypes.go MyInterface
+//go:generate go run github.com/hoenn/minifake ./alltypes.go MyInterface
 type MyInterface interface {
 	BoolMethod(b bool) bool
 	StringMethod(s string) string

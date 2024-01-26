@@ -1,4 +1,4 @@
-module github.com/hoenn/ministub
+module github.com/hoenn/minifake
 
 go 1.20
 
