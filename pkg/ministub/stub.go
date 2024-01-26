@@ -45,25 +45,31 @@ type InterfaceData struct {
 	Methods []*MethodData
 }
 
-// ParseAndStub will read from filepath, or directly use src if filepath is empty, to parse
+func ParseAndStubFromSrc(interfaceNames []string, src string, formatted bool) ([]byte, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, "", src, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse src: %w", err)
+	}
+
+	return parseAndStub(interfaceNames, node, formatted)
+
+}
+
+func ParseAndStubFromFile(interfaceNames []string, filepath string, formatted bool) ([]byte, error) {
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filepath, nil, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse file: %w", err)
+	}
+	return parseAndStub(interfaceNames, node, formatted)
+
+}
+
+// parseAndStub will read from filepath, or directly use src if filepath is empty, to parse
 // and generate a stubbed fake implementation of interfaceName. src will not be used if filepath
 // is provided.
-func ParseAndStub(interfaceNames []string, filepath, src string, formatted bool) ([]byte, error) {
-	fset := token.NewFileSet()
-	var err error
-	var node *ast.File
-	if filepath != "" {
-		node, err = parser.ParseFile(fset, filepath, nil, parser.ParseComments)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse file: %w", err)
-		}
-
-	} else {
-		node, err = parser.ParseFile(fset, "", src, parser.ParseComments)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse src: %w", err)
-		}
-	}
+func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]byte, error) {
 
 	packageName := node.Name.Name
 	var interfaces []*InterfaceData

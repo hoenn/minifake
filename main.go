@@ -24,7 +24,7 @@ func main() {
 	for i, n := range interfaceNames {
 		interfaceNames[i] = strings.TrimSpace(n)
 	}
-	bs, err := ministub.ParseAndStub(interfaceNames, filepath, "", true)
+	bs, err := ministub.ParseAndStubFromFile(interfaceNames, filepath, true)
 	if err != nil {
 		fmt.Println("Unable to parse and create fake:", err)
 		os.Exit(1)
