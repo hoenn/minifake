@@ -4,12 +4,15 @@
 With this simplistic implementation you can recreate missing features like call counts or thread safety at the stub level if needed.
 
 ### Usage
-With a built binary:
+Use with a `go:generate` directive:
 ```
-minifake <file.go> <interface name>
-```
+package foo
 
-Output will be formatted Go code to standard out.
+//go:generate go run github.com/hoenn/minifake ./filename.go InterfaceA,InterfaceB
+type InterfaceA interface {}
+// ...
+type InterfaceB interface {}
+```
 
 ### Examples
 ```go
