@@ -56,14 +56,15 @@ func (f *FakeJobQueuer) Queue() []*Job {
 func TestJobQueuer(t *testing.T) {
 	f := &FakeJobQueuer{
 		EnqueueStub: func(j *Job) error {
-            // Implement behavior you want to mock, like returning
-            // a specific error.
+			// Implement behavior you want to mock, like returning
+			// a specific error.
 		},
 		DequeueStub: func(j *Job) error {
-            // Or use a bool to check if a function is ever called.
+			// Or use a bool to check if a function is ever called.
 			// dequeueCalled = true
+			// dequeueCalls++
 		},
-        // Undefined Queue() stub panics when called.
+        // Undefined QueueStub() panics when called.
 	}
 	svc := newComplicatedService(fakeJobQueuer)
 	// Expected dequeueCalled to be true
