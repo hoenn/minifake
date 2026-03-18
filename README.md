@@ -64,7 +64,7 @@ func TestJobQueuer(t *testing.T) {
 			// dequeueCalled = true
 			// dequeueCalls++
 		},
-		// Undefined QueueStub() panics when called.
+		// Undefined QueueStub() returns zero value when called.
 	}
 	svc := newComplicatedService(fakeJobQueuer)
 	// Expected dequeueCalled to be true

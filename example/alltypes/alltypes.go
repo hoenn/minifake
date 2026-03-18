@@ -26,8 +26,11 @@ type MyInterface interface {
 	ArrayMethod(a [5]int) [5]int
 	MapMethod(m map[string]int) map[string]int
 	InterfaceMethod(i interface{}) interface{}
+	InterfaceAnyMethod(i any) any
 	FunctionMethod(f func(int) int) func(int) int
 	PointerMethod(p *int) *int
 	UnnamedParam(int) bool
 	VariadicParam(s string, ss ...string) bool
+	ZeroResultMethod()
+	ZeroResultMethodWithParam(s int)
 }

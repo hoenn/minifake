@@ -27,17 +27,28 @@ type Fake{{$interfaceName}} struct {
 
 {{- range .Methods}}
 func (fakeImpl *Fake{{$interfaceName}}) {{.MethodName}}({{.Params}}) {{.Results}} {
-    return fakeImpl.{{.MethodName}}Stub({{.ParamNames}})
+	if fakeImpl.{{.MethodName}}Stub != nil {
+{{- if .HasResults}}
+		return fakeImpl.{{.MethodName}}Stub({{.ParamNames}})
+{{- else}}
+		fakeImpl.{{.MethodName}}Stub({{.ParamNames}})
+{{- end}}
+	}
+{{- if .HasResults}}
+	return {{.ZeroResults}}
+{{- end}}
 }
 {{- end}}
 {{- end}}
 `
 
 type MethodData struct {
-	MethodName string
-	Params     string
-	Results    string
-	ParamNames string
+	MethodName  string
+	Params      string
+	Results     string
+	HasResults  bool
+	ZeroResults string
+	ParamNames  string
 }
 
 type InterfaceData struct {
@@ -70,7 +81,6 @@ func ParseAndStubFromFile(interfaceNames []string, filepath string, formatted bo
 // and generate a stubbed fake implementation of interfaceName. src will not be used if filepath
 // is provided.
 func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]byte, error) {
-
 	packageName := node.Name.Name
 	var interfaces []*InterfaceData
 	for _, decl := range node.Decls {
@@ -95,11 +105,18 @@ func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]by
 			}
 			var methods []*MethodData
 			for _, m := range interfaceType.Methods.List {
+				if len(m.Names) == 0 { // Embedded interface
+					return nil, fmt.Errorf("embedded interfaces are not supported, found in %s", interfaceName)
+				}
+				// Method
+				funcType := m.Type.(*ast.FuncType)
 				methods = append(methods, &MethodData{
-					MethodName: m.Names[0].Name,
-					Params:     paramsToString(m.Type.(*ast.FuncType).Params),
-					Results:    resultsToString(m.Type.(*ast.FuncType).Results),
-					ParamNames: paramNamesToString(m.Type.(*ast.FuncType).Params),
+					MethodName:  m.Names[0].Name,
+					Params:      paramsToString(m.Type.(*ast.FuncType).Params),
+					Results:     resultsToString(m.Type.(*ast.FuncType).Results),
+					ParamNames:  paramNamesToString(m.Type.(*ast.FuncType).Params),
+					HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
+					ZeroResults: zeroResultsToString(funcType.Results),
 				})
 			}
 			interfaces = append(interfaces, &InterfaceData{
@@ -159,7 +176,7 @@ func paramsToString(fields *ast.FieldList) string {
 
 	var params []string
 	for i, field := range fields.List {
-		typeString := fieldTypeToString(field.Type)
+		typeString := exprToString(field.Type)
 		if len(field.Names) == 0 {
 			params = append(params, fmt.Sprintf("arg%d %s", i, typeString))
 		} else {
@@ -179,7 +196,7 @@ func resultsToString(fields *ast.FieldList) string {
 
 	var params []string
 	for _, field := range fields.List {
-		typeString := fieldTypeToString(field.Type)
+		typeString := exprToString(field.Type)
 		if len(field.Names) == 0 {
 			params = append(params, typeString)
 		} else {
@@ -195,11 +212,11 @@ func resultsToString(fields *ast.FieldList) string {
 	return fmt.Sprintf("(%s)", strings.Join(params, ", "))
 }
 
-func fieldTypeToString(expr ast.Expr) string {
+func exprToString(expr ast.Expr) string {
 	var sb strings.Builder
 	err := format.Node(&sb, token.NewFileSet(), expr)
 	if err != nil {
-		panic("failed to convert field type to string: " + err.Error())
+		panic("failed to convert expr to string: " + err.Error())
 	}
 	return sb.String()
 }
@@ -226,4 +243,88 @@ func paramNamesToString(fields *ast.FieldList) string {
 	}
 
 	return strings.Join(names, ",")
+}
+
+func zeroResultsToString(results *ast.FieldList) string {
+	if results == nil || len(results.List) == 0 {
+		return ""
+	}
+
+	var zeros []string
+	for _, field := range results.List {
+		n := len(field.Names)
+		if n == 0 {
+			n = 1
+		}
+		z := zeroValueForExpr(field.Type)
+		for i := 0; i < n; i++ {
+			zeros = append(zeros, z)
+		}
+	}
+	return strings.Join(zeros, ", ")
+}
+
+func zeroValueForExpr(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "bool":
+			return "false"
+		case "string":
+			return `""`
+		case "error":
+			return "nil"
+		default:
+			// numeric builtins and named types
+			if isNumericBuiltin(t.Name) {
+				return "0"
+			}
+			// Special case for newer 'any' keyword instead of interface{}
+			if t.Name == "any" {
+				return "nil"
+			}
+			return t.Name + "{}"
+		}
+
+	case *ast.SelectorExpr:
+		// pkg.Type
+		return exprToString(t) + "{}"
+
+	case *ast.StarExpr:
+		return "nil"
+
+	case *ast.ArrayType:
+		if t.Len == nil {
+			return "nil" // slice
+		}
+		return exprToString(t) + "{}"
+
+	case *ast.MapType:
+		return "nil"
+
+	case *ast.InterfaceType:
+		return "nil"
+
+	case *ast.FuncType:
+		return "nil"
+
+	case *ast.ChanType:
+		return "nil"
+
+	default:
+		return "nil"
+	}
+}
+
+func isNumericBuiltin(s string) bool {
+	switch s {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"byte", "rune",
+		"float32", "float64",
+		"complex64", "complex128":
+		return true
+	default:
+		return false
+	}
 }

@@ -9,28 +9,53 @@ type FakeJobQueuer struct {
 }
 
 func (fakeImpl *FakeJobQueuer) Enqueue(j *Job) error {
-	return fakeImpl.EnqueueStub(j)
+	if fakeImpl.EnqueueStub != nil {
+		return fakeImpl.EnqueueStub(j)
+	}
+	return nil
 }
 func (fakeImpl *FakeJobQueuer) Dequeue(j *Job) error {
-	return fakeImpl.DequeueStub(j)
+	if fakeImpl.DequeueStub != nil {
+		return fakeImpl.DequeueStub(j)
+	}
+	return nil
 }
 func (fakeImpl *FakeJobQueuer) Queue() []*Job {
-	return fakeImpl.QueueStub()
+	if fakeImpl.QueueStub != nil {
+		return fakeImpl.QueueStub()
+	}
+	return nil
 }
 
 // FakeJobList implements JobList.
 type FakeJobList struct {
-	AppendStub func(j *Job) error
-	RemoveStub func(j *Job) error
-	GetStub    func(arg0 string) *Job
+	AppendStub  func(j *Job) error
+	RemoveStub  func(j *Job) error
+	GetStub     func(arg0 string) *Job
+	RefreshStub func()
 }
 
 func (fakeImpl *FakeJobList) Append(j *Job) error {
-	return fakeImpl.AppendStub(j)
+	if fakeImpl.AppendStub != nil {
+		return fakeImpl.AppendStub(j)
+	}
+	return nil
 }
 func (fakeImpl *FakeJobList) Remove(j *Job) error {
-	return fakeImpl.RemoveStub(j)
+	if fakeImpl.RemoveStub != nil {
+		return fakeImpl.RemoveStub(j)
+	}
+	return nil
 }
 func (fakeImpl *FakeJobList) Get(arg0 string) *Job {
-	return fakeImpl.GetStub(arg0)
+	if fakeImpl.GetStub != nil {
+		return fakeImpl.GetStub(arg0)
+	}
+	return nil
+}
+func (fakeImpl *FakeJobList) Refresh() {
+	if fakeImpl.RefreshStub != nil {
+		fakeImpl.RefreshStub()
+		return
+	}
 }
