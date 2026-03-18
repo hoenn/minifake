@@ -38,6 +38,19 @@ type InterfaceB interface {}
 | Type constraint unions (`~int \| string`) | No | Not handled |
 | Multi-file same-package interfaces | No | Single-file AST only |
 
+### Same-package generation
+`minifake` generates fakes into the same package as the interface definition. This is a deliberate design choice as same-package generation has full visibility into unexported types and avoids circular dependencies. Interfaces with unexprted types in their method signatures work without any additional configuration. For example:
+``` go
+type Client interface {
+    Send(msg *message) error // unexported type
+}
+```
+
+Other tools that generate fakes into separate packages cannot compile fakes for an interface like this, as the unexported type will be unavailable in the `fakefoo` package.
+
+The tradeoff for this functionality is that generated fakes are compiled with production code. In practice this should have minimal impact since the generated fake is a lightweight struct.
+
+
 ### Examples
 ```go
 // testdata.go where an interface is defined.
