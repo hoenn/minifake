@@ -1,4 +1,4 @@
-module github.com/hoenn/minifake
+module github.com/hoenn/mimic
 
 go 1.20
 

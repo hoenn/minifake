@@ -1,4 +1,4 @@
-package minifake
+package mimic
 
 import (
 	"os"
@@ -41,15 +41,15 @@ func TestGolden(t *testing.T) {
 	}
 }
 func extractInterfaceNames(t *testing.T, src string) []string {
-	// Expected format: //go:generate go run github.com/hoenn/minifake ./file.go Name1,Name2
+	// Expected format: //go:generate go run github.com/hoenn/mimic ./file.go Name1,Name2
 	t.Helper()
 	for _, line := range strings.Split(src, "\n") {
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "//go:generate go run github.com/hoenn/minifake") {
+		if !strings.HasPrefix(line, "//go:generate go run github.com/hoenn/mimic") {
 			continue
 		}
 		fields := strings.Fields(line)
-		// //go:generate go run github.com/hoenn/minifake ./file.go Name1,Name2
+		// //go:generate go run github.com/hoenn/mimic ./file.go Name1,Name2
 		// fields[0]       [1]  [2]  [3]                          [4]      [5]
 		require.GreaterOrEqual(t, len(fields), 6,
 			"go:generate directive must include file path and interface names")
@@ -59,7 +59,7 @@ func extractInterfaceNames(t *testing.T, src string) []string {
 		}
 		return names
 	}
-	t.Fatal("no //go:generate go run github.com/hoenn/minifake directive found")
+	t.Fatal("no //go:generate go run github.com/hoenn/mimic directive found")
 	return nil
 }
 
