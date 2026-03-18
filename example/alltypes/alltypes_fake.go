@@ -213,12 +213,10 @@ func (fakeImpl *FakeMyInterface) VariadicParam(s string, ss ...string) bool {
 func (fakeImpl *FakeMyInterface) ZeroResultMethod() {
 	if fakeImpl.ZeroResultMethodStub != nil {
 		fakeImpl.ZeroResultMethodStub()
-		return
 	}
 }
 func (fakeImpl *FakeMyInterface) ZeroResultMethodWithParam(s int) {
 	if fakeImpl.ZeroResultMethodWithParamStub != nil {
 		fakeImpl.ZeroResultMethodWithParamStub(s)
-		return
 	}
 }
