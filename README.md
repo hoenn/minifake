@@ -14,6 +14,30 @@ type InterfaceA interface {}
 type InterfaceB interface {}
 ```
 
+## Functionality Matrix
+| Feature | Status | Notes |
+|---|---|---|
+| Basic methods | Yes | Named params, results, zero values |
+| Unnamed params | Yes | Auto-named `arg0`, `arg1`, ... |
+| Variadic params | Yes | Forwarded with `...` |
+| Empty interfaces | Yes | Generates empty struct |
+| All builtin types | Yes | Correct zero values |
+| Pointer/slice/map/chan/func returns | Yes | Returns `nil` |
+| Array returns | Yes | Returns `[N]T{}` |
+| `interface{}`/`any` returns | Yes | Returns `nil` |
+| Named struct returns | Yes | Returns `T{}` |
+| `pkg.Type` returns | Yes | Returns `pkg.T{}` |
+| Multiple interfaces per file | Yes | Comma-separated names |
+| Same-file embedded interfaces | Yes | Recursive resolution |
+| Transitive embeds (A→B→C) | Yes | Recursive |
+| Mixed embeds + methods | Yes | Both collected |
+| Cross-package embeds (`io.Reader`) | No | Errors with message |
+| Diamond embedding dedup | No | Will generate duplicate fields |
+| Overlapping method dedup (Go 1.14+) | No | Same issue |
+| Generic interfaces (`T[K]`) | No | Not handled |
+| Type constraint unions (`~int \| string`) | No | Not handled |
+| Multi-file same-package interfaces | No | Single-file AST only |
+
 ### Examples
 ```go
 // testdata.go where an interface is defined.

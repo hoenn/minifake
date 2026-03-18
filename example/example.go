@@ -19,7 +19,14 @@ type JobList interface {
 	Refresh()
 }
 
+// JobPrinter explicitly not included in the generate directive, but is embedded in JobServer.
+type JobPrinter interface {
+	Print() error
+}
+
 type JobServer interface {
 	JobList
 	JobQueuer
+	JobPrinter
+	Health() (bool, error)
 }

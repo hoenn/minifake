@@ -82,6 +82,7 @@ func ParseAndStubFromFile(interfaceNames []string, filepath string, formatted bo
 // is provided.
 func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]byte, error) {
 	packageName := node.Name.Name
+	allInterfaces := buildInterfaceMap(node)
 	var interfaces []*InterfaceData
 	for _, decl := range node.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -106,7 +107,26 @@ func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]by
 			var methods []*MethodData
 			for _, m := range interfaceType.Methods.List {
 				if len(m.Names) == 0 { // Embedded interface
-					return nil, fmt.Errorf("embedded interfaces are not supported, found in %s", interfaceName)
+					embeddedName, err := embeddedInterfaceName(m.Type)
+					if err != nil {
+						return nil, fmt.Errorf("could not resolve embedded interface in %s: %w", interfaceName, err)
+					}
+					resolved, err := resolveEmbeddedMethods(embeddedName, allInterfaces)
+					if err != nil {
+						return nil, fmt.Errorf("could not resolve embedded interface in %s: %w", interfaceName, err)
+					}
+					for _, r := range resolved {
+						funcType := r.Type.(*ast.FuncType)
+						methods = append(methods, &MethodData{
+							MethodName:  r.Names[0].Name,
+							Params:      paramsToString(funcType.Params),
+							Results:     resultsToString(funcType.Results),
+							ParamNames:  paramNamesToString(funcType.Params),
+							HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
+							ZeroResults: zeroResultsToString(funcType.Results),
+						})
+					}
+					continue
 				}
 				// Method
 				funcType := m.Type.(*ast.FuncType)
@@ -157,7 +177,63 @@ func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]by
 	}
 
 	return bs, nil
+}
 
+func buildInterfaceMap(node *ast.File) map[string]*ast.InterfaceType {
+	m := map[string]*ast.InterfaceType{}
+	for _, decl := range node.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			iface, ok := ts.Type.(*ast.InterfaceType)
+			if !ok {
+				continue
+			}
+			m[ts.Name.Name] = iface
+		}
+	}
+	return m
+}
+
+func resolveEmbeddedMethods(name string, allInterfaces map[string]*ast.InterfaceType) ([]*ast.Field, error) {
+	iface, ok := allInterfaces[name]
+	if !ok {
+		return nil, fmt.Errorf("cannot resolve cross-package embedded interface: %s", name)
+	}
+	var methods []*ast.Field
+	for _, field := range iface.Methods.List {
+		if len(field.Names) != 0 { // Base case, no embedded interface.
+			methods = append(methods, field)
+			continue
+		}
+		embeddedName, err := embeddedInterfaceName(field.Type)
+		if err != nil {
+			return nil, err
+		}
+		nested, err := resolveEmbeddedMethods(embeddedName, allInterfaces)
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, nested...)
+	}
+	return methods, nil
+}
+
+func embeddedInterfaceName(expr ast.Expr) (string, error) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name, nil
+	case *ast.SelectorExpr:
+		return "", fmt.Errorf("cross-package embed %s not supported", exprToString(expr))
+	default:
+		return "", fmt.Errorf("unsupported embedded type: %s", exprToString(expr))
+	}
 }
 
 func contains(slice []string, str string) bool {
