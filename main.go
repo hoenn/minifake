@@ -38,7 +38,12 @@ func main() {
 		fmt.Printf("Unable to open %s for writing: %s\n", fakeFilepath, err.Error())
 		os.Exit(1)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			fmt.Printf("Unable to close %s: %v", fakeFilepath, err)
+		}
+	}()
 
 	_, err = f.Write(bs)
 	if err != nil {
