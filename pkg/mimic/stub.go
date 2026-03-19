@@ -276,7 +276,7 @@ func sigParamsToString(pkg *types.Package, sig *types.Signature) string {
 		if name == "" {
 			name = fmt.Sprintf("arg%d", i)
 		}
-		qualifier := types.RelativeTo(pkg)
+		qualifier := localQualifier(pkg)
 		typeStr := types.TypeString(p.Type(), qualifier)
 		if sig.Variadic() && i == params.Len()-1 {
 			// Convert []T to ...T for the last param
@@ -298,7 +298,7 @@ func sigResultsToString(pkg *types.Package, sig *types.Signature) string {
 	var parts []string
 	for i := range results.Len() {
 		r := results.At(i)
-		qualifier := types.RelativeTo(pkg)
+		qualifier := localQualifier(pkg)
 		typeStr := types.TypeString(r.Type(), qualifier)
 		if r.Name() != "" {
 			parts = append(parts, r.Name()+" "+typeStr)
@@ -342,8 +342,17 @@ func sigZeroResultsToString(pkg *types.Package, sig *types.Signature) string {
 	return strings.Join(zeros, ", ")
 }
 
+func localQualifier(local *types.Package) types.Qualifier {
+	return func(pkg *types.Package) string {
+		if pkg == local {
+			return ""
+		}
+		return pkg.Name()
+	}
+}
+
 func zeroValueForTypesType(pkg *types.Package, typ types.Type) string {
-	qualifier := types.RelativeTo(pkg)
+	qualifier := localQualifier(pkg)
 	switch t := typ.Underlying().(type) {
 	case *types.Basic:
 		switch {
