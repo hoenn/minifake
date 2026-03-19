@@ -376,6 +376,9 @@ func zeroValueForExpr(expr ast.Expr) string {
 		}
 		return exprToString(t) + "{}"
 
+	case *ast.StructType:
+		return exprToString(t) + "{}"
+
 	case *ast.MapType:
 		return "nil"
 

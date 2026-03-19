@@ -34,6 +34,7 @@ type FakeAllTypes struct {
 	VariadicParamStub             func(s string, ss ...string) bool
 	ZeroResultMethodStub          func()
 	ZeroResultMethodWithParamStub func(s int)
+	AnonymousStructMethodStub     func(arg0 struct{ X int }) struct{ X int }
 }
 
 func (fakeImpl *FakeAllTypes) BoolMethod(b bool) bool {
@@ -219,4 +220,10 @@ func (fakeImpl *FakeAllTypes) ZeroResultMethodWithParam(s int) {
 	if fakeImpl.ZeroResultMethodWithParamStub != nil {
 		fakeImpl.ZeroResultMethodWithParamStub(s)
 	}
+}
+func (fakeImpl *FakeAllTypes) AnonymousStructMethod(arg0 struct{ X int }) struct{ X int } {
+	if fakeImpl.AnonymousStructMethodStub != nil {
+		return fakeImpl.AnonymousStructMethodStub(arg0)
+	}
+	return struct{ X int }{}
 }

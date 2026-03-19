@@ -39,4 +39,5 @@ type AllTypes interface {
 	VariadicParam(s string, ss ...string) bool
 	ZeroResultMethod()
 	ZeroResultMethodWithParam(s int)
+	AnonymousStructMethod(struct{ X int }) struct{ X int }
 }
