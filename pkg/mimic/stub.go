@@ -92,14 +92,14 @@ func ParseAndStubFromFile(interfaceNames []string, filePath string, formatted bo
 	if node == nil {
 		return nil, fmt.Errorf("file %s not found in package", filePath)
 	}
-	return parseAndStub(interfaceNames, node, pkg.TypesInfo, formatted)
+	return parseAndStub(interfaceNames, node, pkg.TypesInfo, pkg.Types, formatted)
 
 }
 
 // parseAndStub will read from filePath, or directly use src if filePath is empty, to parse
 // and generate a stubbed fake implementation of interfaceName. src will not be used if filePath
 // is provided.
-func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, formatted bool) ([]byte, error) {
+func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, pkg *types.Package, formatted bool) ([]byte, error) {
 	packageName := node.Name.Name
 	allInterfaces := buildInterfaceMap(node)
 	var interfaces []*InterfaceData
@@ -126,7 +126,7 @@ func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, for
 			var methods []*MethodData
 			for _, m := range interfaceType.Methods.List {
 				if len(m.Names) == 0 { // Embedded interface
-					resolved, err := resolveEmbeddedMethods(m.Type, info, allInterfaces)
+					resolved, err := resolveEmbeddedMethods(m.Type, info, pkg, allInterfaces)
 					if err != nil {
 						return nil, fmt.Errorf("could not resolve embedded interface in %s: %w", interfaceName, err)
 					}
@@ -206,11 +206,11 @@ func buildInterfaceMap(node *ast.File) map[string]*ast.InterfaceType {
 	return m
 }
 
-func resolveEmbeddedMethods(expr ast.Expr, info *types.Info, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
+func resolveEmbeddedMethods(expr ast.Expr, info *types.Info, pkg *types.Package, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
 	// Try local AST resolution first for same-package embeds
 	if ident, ok := expr.(*ast.Ident); ok {
 		if iface, ok := allInterfaces[ident.Name]; ok {
-			return resolveLocalEmbeddedMethods(iface, info, allInterfaces)
+			return resolveLocalEmbeddedMethods(iface, info, pkg, allInterfaces)
 		}
 	}
 
@@ -223,10 +223,10 @@ func resolveEmbeddedMethods(expr ast.Expr, info *types.Info, allInterfaces map[s
 	if !ok {
 		return nil, fmt.Errorf("embedded type %s is not an interface", exprToString(expr))
 	}
-	return methodDataFromTypesInterface(iface), nil
+	return methodDataFromTypesInterface(pkg, iface), nil
 }
 
-func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
+func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, pkg *types.Package, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
 	var methods []*MethodData
 	for _, field := range iface.Methods.List {
 		if len(field.Names) != 0 {
@@ -241,7 +241,7 @@ func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, all
 			})
 			continue
 		}
-		nested, err := resolveEmbeddedMethods(field.Type, info, allInterfaces)
+		nested, err := resolveEmbeddedMethods(field.Type, info, pkg, allInterfaces)
 		if err != nil {
 			return nil, err
 		}
@@ -250,15 +250,15 @@ func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, all
 	return methods, nil
 }
 
-func methodDataFromTypesInterface(iface *types.Interface) []*MethodData {
+func methodDataFromTypesInterface(pkg *types.Package, iface *types.Interface) []*MethodData {
 	var methods []*MethodData
 	for i := range iface.NumMethods() {
 		method := iface.Method(i)
 		sig := method.Type().(*types.Signature)
 		methods = append(methods, &MethodData{
 			MethodName:  method.Name(),
-			Params:      sigParamsToString(sig),
-			Results:     sigResultsToString(sig),
+			Params:      sigParamsToString(pkg, sig),
+			Results:     sigResultsToString(pkg, sig),
 			ParamNames:  sigParamNamesToString(sig),
 			HasResults:  sig.Results().Len() > 0,
 			ZeroResults: sigZeroResultsToString(sig),
@@ -267,7 +267,7 @@ func methodDataFromTypesInterface(iface *types.Interface) []*MethodData {
 	return methods
 }
 
-func sigParamsToString(sig *types.Signature) string {
+func sigParamsToString(pkg *types.Package, sig *types.Signature) string {
 	params := sig.Params()
 	var parts []string
 	for i := range params.Len() {
@@ -276,7 +276,8 @@ func sigParamsToString(sig *types.Signature) string {
 		if name == "" {
 			name = fmt.Sprintf("arg%d", i)
 		}
-		typeStr := types.TypeString(p.Type(), nil)
+		qualifier := types.RelativeTo(pkg)
+		typeStr := types.TypeString(p.Type(), qualifier)
 		if sig.Variadic() && i == params.Len()-1 {
 			// Convert []T to ...T for the last param
 			slice, ok := p.Type().(*types.Slice)
@@ -289,7 +290,7 @@ func sigParamsToString(sig *types.Signature) string {
 	return strings.Join(parts, ", ")
 }
 
-func sigResultsToString(sig *types.Signature) string {
+func sigResultsToString(pkg *types.Package, sig *types.Signature) string {
 	results := sig.Results()
 	if results.Len() == 0 {
 		return ""
@@ -297,7 +298,8 @@ func sigResultsToString(sig *types.Signature) string {
 	var parts []string
 	for i := range results.Len() {
 		r := results.At(i)
-		typeStr := types.TypeString(r.Type(), nil)
+		qualifier := types.RelativeTo(pkg)
+		typeStr := types.TypeString(r.Type(), qualifier)
 		if r.Name() != "" {
 			parts = append(parts, r.Name()+" "+typeStr)
 		} else {

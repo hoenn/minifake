@@ -39,7 +39,7 @@ package foo
 | Same-file embedded interfaces | Yes | Recursive resolution |
 | Transitive embeds (A→B→C) | Yes | Recursive |
 | Mixed embeds + methods | Yes | Both collected |
-| Cross-package embeds (`io.Reader`) | Yes | Handled |
+| Cross-package interface and parameter embeds (`io.Reader`) | Yes | Handled |
 | Diamond embedding dedup | No | Will generate duplicate fields |
 | Overlapping method dedup (Go 1.14+) | No | Same issue |
 | Generic interfaces (`T[K]`) | No | Not handled |
