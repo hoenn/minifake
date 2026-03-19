@@ -1,7 +1,13 @@
-package alltypes
+package test
 
-//go:generate go run github.com/hoenn/mimic ./alltypes.go MyInterface
-type MyInterface interface {
+// All built in types
+// Empty interface
+// `any` keyword
+// Zero result methods
+// Pointer/slice/map/chan/func parameters and returns
+
+//go:generate go run github.com/hoenn/mimic ./alltypes.go AllTypes
+type AllTypes interface {
 	BoolMethod(b bool) bool
 	StringMethod(s string) string
 	IntMethod(i int) int

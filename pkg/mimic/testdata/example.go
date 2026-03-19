@@ -1,8 +1,14 @@
-// nolint
-package example
+package test
 
+// Mixed embedded interfaces + methods
+// Multiple interfaces per file
+// Package private types in fakes
+// Embedded interface that is not explicitly generated
+// Package type returns
+
+type jobName string
 type Job struct {
-	name string
+	name jobName
 }
 
 //go:generate go run github.com/hoenn/mimic ./example.go JobQueuer,JobList,JobServer
@@ -15,11 +21,11 @@ type JobQueuer interface {
 type JobList interface {
 	Append(j *Job) error
 	Remove(j *Job) error
-	Get(string) *Job
+	Get(jobName) *Job
 	Refresh()
 }
 
-// JobPrinter explicitly not included in the generate directive, but is embedded in JobServer.
+// JobPrinter explicitly excluded in generate directive, but is embedded in JobServer.
 type JobPrinter interface {
 	Print() error
 }

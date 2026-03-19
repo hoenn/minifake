@@ -56,6 +56,7 @@ type InterfaceData struct {
 	Methods []*MethodData
 }
 
+// ParseAndStubFromSrc is primarily used for testing.
 func ParseAndStubFromSrc(interfaceNames []string, src string, formatted bool) ([]byte, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, "", src, parser.ParseComments)
@@ -64,9 +65,9 @@ func ParseAndStubFromSrc(interfaceNames []string, src string, formatted bool) ([
 	}
 
 	return parseAndStub(interfaceNames, node, formatted)
-
 }
 
+// ParseAndStubFromFile is the main entry point for go generated use cases.
 func ParseAndStubFromFile(interfaceNames []string, filepath string, formatted bool) ([]byte, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filepath, nil, parser.ParseComments)

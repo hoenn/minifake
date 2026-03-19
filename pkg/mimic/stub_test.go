@@ -23,6 +23,7 @@ func TestGolden(t *testing.T) {
 	for _, input := range inputs {
 		fileName := strings.TrimSuffix(input, ".go")
 		t.Run(fileName, func(t *testing.T) {
+			t.Parallel()
 			inputPath := filepath.Join("testdata", fileName)
 			goldenPath := inputPath + "_fake.go.golden"
 
