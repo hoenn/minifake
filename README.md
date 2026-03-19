@@ -8,10 +8,18 @@ Use with a `go:generate` directive:
 ```go
 package foo
 
-//go:generate go run github.com/hoenn/mimic ./filename.go InterfaceA,InterfaceB
+//go:generate go run github.com/hoenn/mimic InterfaceA,InterfaceB
 type InterfaceA interface {}
 // ...
 type InterfaceB interface {}
+```
+
+You can also specify the file the interface appears in in the generate directive, which can be useful if you want a single `generate.go` file.
+```go
+package foo
+// Generates fileA_fake.go and fileB_fake.go
+//go:generate go run github.com/hoenn/mimic ./fileA.go InterfaceA,InterfaceB
+//go:generate go run github.com/hoenn/mimic ./fileB.go InterfaceC
 ```
 
 ## Functionality Matrix

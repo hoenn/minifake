@@ -10,13 +10,21 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: mimic <file.go> <interfaceA,interfaceB>")
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: mimic {optional <file.go>} <interfaceA,interfaceB>")
 		os.Exit(1)
 	}
 
-	filepath := os.Args[1]
-	interfaceNamesStr := os.Args[2]
+	// Use GOFILE if filename is not specified. Specifying filenames is useful
+	// for a single generate.go file in a package with multiple generate directives.
+	filepath := os.Getenv("GOFILE")
+	interfaceNamesStr := ""
+	if len(os.Args) == 3 {
+		filepath = os.Args[1]
+		interfaceNamesStr = os.Args[2]
+	} else {
+		interfaceNamesStr = os.Args[1]
+	}
 	interfaceNames := strings.Split(interfaceNamesStr, ",")
 	filename := path.Base(filepath)
 	fmt.Printf("Generating fakes for %v from %s\n", interfaceNames, filename)
