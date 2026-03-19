@@ -44,7 +44,6 @@ package foo
 | Overlapping method dedup (Go 1.14+) | No | Same issue |
 | Generic interfaces (`T[K]`) | No | Not handled |
 | Type constraint unions (`~int \| string`) | No | Not handled |
-| Multi-file same-package interfaces | No | Single-file AST only |
 
 ### Same-package generation
 `mimic` generates fakes into the same package as the interface definition. This is a deliberate design choice as same-package generation has full visibility into unexported types and avoids circular dependencies. Interfaces with unexported types in their method signatures work without any additional configuration. For example:
