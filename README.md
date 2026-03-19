@@ -47,8 +47,9 @@ package foo
 | Multi-file same-package interfaces | No | Single-file AST only |
 
 ### Same-package generation
-`mimic` generates fakes into the same package as the interface definition. This is a deliberate design choice as same-package generation has full visibility into unexported types and avoids circular dependencies. Interfaces with unexprted types in their method signatures work without any additional configuration. For example:
+`mimic` generates fakes into the same package as the interface definition. This is a deliberate design choice as same-package generation has full visibility into unexported types and avoids circular dependencies. Interfaces with unexported types in their method signatures work without any additional configuration. For example:
 ``` go
+type message string
 type Client interface {
     Send(msg *message) error // unexported type
 }
