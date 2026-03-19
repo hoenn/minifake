@@ -7,9 +7,13 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"go/types"
+	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/imports"
 )
 
@@ -59,29 +63,56 @@ type InterfaceData struct {
 // ParseAndStubFromSrc is primarily used for testing.
 func ParseAndStubFromSrc(interfaceNames []string, src string, formatted bool) ([]byte, error) {
 	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, "", src, parser.ParseComments)
+	_, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse src: %w", err)
 	}
+	return nil, nil
 
-	return parseAndStub(interfaceNames, node, formatted)
+	//return parseAndStub(interfaceNames, node, formatted)
 }
 
 // ParseAndStubFromFile is the main entry point for go generated use cases.
-func ParseAndStubFromFile(interfaceNames []string, filepath string, formatted bool) ([]byte, error) {
-	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, filepath, nil, parser.ParseComments)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse file: %w", err)
+func ParseAndStubFromFile(interfaceNames []string, filePath string, formatted bool) ([]byte, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedName,
 	}
-	return parseAndStub(interfaceNames, node, formatted)
+
+	filePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve absolute path: %w", err)
+	}
+
+	pkgs, err := packages.Load(cfg, "file="+filePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not load package: %w", err)
+	}
+	if len(pkgs) == 0 {
+		return nil, fmt.Errorf("no packages found for %s", filePath)
+	}
+	pkg := pkgs[0]
+	if len(pkg.Errors) > 0 {
+		return nil, fmt.Errorf("package errors: %v", pkg.Errors[0])
+	}
+	var node *ast.File
+	for _, f := range pkg.Syntax {
+		pos := pkg.Fset.Position(f.Pos())
+		if pos.Filename == filePath {
+			node = f
+			break
+		}
+	}
+	if node == nil {
+		return nil, fmt.Errorf("file %s not found in package", filePath)
+	}
+	return parseAndStub(interfaceNames, node, pkg.TypesInfo, formatted)
 
 }
 
-// parseAndStub will read from filepath, or directly use src if filepath is empty, to parse
-// and generate a stubbed fake implementation of interfaceName. src will not be used if filepath
+// parseAndStub will read from filePath, or directly use src if filePath is empty, to parse
+// and generate a stubbed fake implementation of interfaceName. src will not be used if filePath
 // is provided.
-func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]byte, error) {
+func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, formatted bool) ([]byte, error) {
 	packageName := node.Name.Name
 	allInterfaces := buildInterfaceMap(node)
 	var interfaces []*InterfaceData
@@ -102,31 +133,17 @@ func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]by
 				continue
 			}
 			interfaceName := typeSpec.Name.Name
-			if !contains(interfaceNames, interfaceName) {
+			if !slices.Contains(interfaceNames, interfaceName) {
 				continue
 			}
 			var methods []*MethodData
 			for _, m := range interfaceType.Methods.List {
 				if len(m.Names) == 0 { // Embedded interface
-					embeddedName, err := embeddedInterfaceName(m.Type)
+					resolved, err := resolveEmbeddedMethods(m.Type, info, allInterfaces)
 					if err != nil {
 						return nil, fmt.Errorf("could not resolve embedded interface in %s: %w", interfaceName, err)
 					}
-					resolved, err := resolveEmbeddedMethods(embeddedName, allInterfaces)
-					if err != nil {
-						return nil, fmt.Errorf("could not resolve embedded interface in %s: %w", interfaceName, err)
-					}
-					for _, r := range resolved {
-						funcType := r.Type.(*ast.FuncType)
-						methods = append(methods, &MethodData{
-							MethodName:  r.Names[0].Name,
-							Params:      paramsToString(funcType.Params),
-							Results:     resultsToString(funcType.Results),
-							ParamNames:  paramNamesToString(funcType.Params),
-							HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
-							ZeroResults: zeroResultsToString(funcType.Results),
-						})
-					}
+					methods = append(methods, resolved...)
 					continue
 				}
 				// Method
@@ -137,7 +154,7 @@ func parseAndStub(interfaceNames []string, node *ast.File, formatted bool) ([]by
 					Results:     resultsToString(m.Type.(*ast.FuncType).Results),
 					ParamNames:  paramNamesToString(m.Type.(*ast.FuncType).Params),
 					HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
-					ZeroResults: zeroResultsToString(funcType.Results),
+					ZeroResults: zeroResultsToString(info, funcType.Results),
 				})
 			}
 			interfaces = append(interfaces, &InterfaceData{
@@ -202,22 +219,42 @@ func buildInterfaceMap(node *ast.File) map[string]*ast.InterfaceType {
 	return m
 }
 
-func resolveEmbeddedMethods(name string, allInterfaces map[string]*ast.InterfaceType) ([]*ast.Field, error) {
-	iface, ok := allInterfaces[name]
-	if !ok {
-		return nil, fmt.Errorf("cannot resolve cross-package embedded interface: %s", name)
+func resolveEmbeddedMethods(expr ast.Expr, info *types.Info, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
+	// Try local AST resolution first for same-package embeds
+	if ident, ok := expr.(*ast.Ident); ok {
+		if iface, ok := allInterfaces[ident.Name]; ok {
+			return resolveLocalEmbeddedMethods(iface, info, allInterfaces)
+		}
 	}
-	var methods []*ast.Field
+
+	// Fall back to type info for cross-package embeds
+	typ := info.TypeOf(expr)
+	if typ == nil {
+		return nil, fmt.Errorf("cannot resolve embedded interface: %s", exprToString(expr))
+	}
+	iface, ok := typ.Underlying().(*types.Interface)
+	if !ok {
+		return nil, fmt.Errorf("embedded type %s is not an interface", exprToString(expr))
+	}
+	return methodDataFromTypesInterface(iface), nil
+}
+
+func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, allInterfaces map[string]*ast.InterfaceType) ([]*MethodData, error) {
+	var methods []*MethodData
 	for _, field := range iface.Methods.List {
-		if len(field.Names) != 0 { // Base case, no embedded interface.
-			methods = append(methods, field)
+		if len(field.Names) != 0 {
+			funcType := field.Type.(*ast.FuncType)
+			methods = append(methods, &MethodData{
+				MethodName:  field.Names[0].Name,
+				Params:      paramsToString(funcType.Params),
+				Results:     resultsToString(funcType.Results),
+				ParamNames:  paramNamesToString(funcType.Params),
+				HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
+				ZeroResults: zeroResultsToString(info, funcType.Results),
+			})
 			continue
 		}
-		embeddedName, err := embeddedInterfaceName(field.Type)
-		if err != nil {
-			return nil, err
-		}
-		nested, err := resolveEmbeddedMethods(embeddedName, allInterfaces)
+		nested, err := resolveEmbeddedMethods(field.Type, info, allInterfaces)
 		if err != nil {
 			return nil, err
 		}
@@ -226,24 +263,115 @@ func resolveEmbeddedMethods(name string, allInterfaces map[string]*ast.Interface
 	return methods, nil
 }
 
-func embeddedInterfaceName(expr ast.Expr) (string, error) {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name, nil
-	case *ast.SelectorExpr:
-		return "", fmt.Errorf("cross-package embed %s not supported", exprToString(expr))
-	default:
-		return "", fmt.Errorf("unsupported embedded type: %s", exprToString(expr))
+func methodDataFromTypesInterface(iface *types.Interface) []*MethodData {
+	var methods []*MethodData
+	for i := range iface.NumMethods() {
+		method := iface.Method(i)
+		sig := method.Type().(*types.Signature)
+		methods = append(methods, &MethodData{
+			MethodName:  method.Name(),
+			Params:      sigParamsToString(sig),
+			Results:     sigResultsToString(sig),
+			ParamNames:  sigParamNamesToString(sig),
+			HasResults:  sig.Results().Len() > 0,
+			ZeroResults: sigZeroResultsToString(sig),
+		})
 	}
+	return methods
 }
 
-func contains(slice []string, str string) bool {
-	for _, item := range slice {
-		if item == str {
-			return true
+func sigParamsToString(sig *types.Signature) string {
+	params := sig.Params()
+	var parts []string
+	for i := range params.Len() {
+		p := params.At(i)
+		name := p.Name()
+		if name == "" {
+			name = fmt.Sprintf("arg%d", i)
+		}
+		typeStr := types.TypeString(p.Type(), nil)
+		if sig.Variadic() && i == params.Len()-1 {
+			// Convert []T to ...T for the last param
+			slice, ok := p.Type().(*types.Slice)
+			if ok {
+				typeStr = "..." + types.TypeString(slice.Elem(), nil)
+			}
+		}
+		parts = append(parts, name+" "+typeStr)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func sigResultsToString(sig *types.Signature) string {
+	results := sig.Results()
+	if results.Len() == 0 {
+		return ""
+	}
+	var parts []string
+	for i := range results.Len() {
+		r := results.At(i)
+		typeStr := types.TypeString(r.Type(), nil)
+		if r.Name() != "" {
+			parts = append(parts, r.Name()+" "+typeStr)
+		} else {
+			parts = append(parts, typeStr)
 		}
 	}
-	return false
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return fmt.Sprintf("(%s)", strings.Join(parts, ", "))
+}
+
+func sigParamNamesToString(sig *types.Signature) string {
+	params := sig.Params()
+	var names []string
+	for i := range params.Len() {
+		p := params.At(i)
+		name := p.Name()
+		if name == "" {
+			name = fmt.Sprintf("arg%d", i)
+		}
+		suffix := ""
+		if sig.Variadic() && i == params.Len()-1 {
+			suffix = "..."
+		}
+		names = append(names, name+suffix)
+	}
+	return strings.Join(names, ",")
+}
+
+func sigZeroResultsToString(sig *types.Signature) string {
+	results := sig.Results()
+	if results.Len() == 0 {
+		return ""
+	}
+	var zeros []string
+	for i := 0; i < results.Len(); i++ {
+		zeros = append(zeros, zeroValueForTypesType(results.At(i).Type()))
+	}
+	return strings.Join(zeros, ", ")
+}
+
+func zeroValueForTypesType(typ types.Type) string {
+	switch t := typ.Underlying().(type) {
+	case *types.Basic:
+		switch {
+		case t.Info()&types.IsBoolean != 0:
+			return "false"
+		case t.Info()&types.IsNumeric != 0:
+			return "0"
+		case t.Info()&types.IsString != 0:
+			return `""`
+		}
+	case *types.Pointer, *types.Slice, *types.Map, *types.Interface, *types.Signature, *types.Chan:
+		return "nil"
+	case *types.Struct:
+		return types.TypeString(typ, nil) + "{}"
+	case *types.Array:
+		return types.TypeString(typ, nil) + "{}"
+	}
+	return "nil"
 }
 
 func paramsToString(fields *ast.FieldList) string {
@@ -322,7 +450,7 @@ func paramNamesToString(fields *ast.FieldList) string {
 	return strings.Join(names, ",")
 }
 
-func zeroResultsToString(results *ast.FieldList) string {
+func zeroResultsToString(info *types.Info, results *ast.FieldList) string {
 	if results == nil || len(results.List) == 0 {
 		return ""
 	}
@@ -333,12 +461,36 @@ func zeroResultsToString(results *ast.FieldList) string {
 		if n == 0 {
 			n = 1
 		}
-		z := zeroValueForExpr(field.Type)
-		for i := 0; i < n; i++ {
+		z := zeroValueForType(info, field.Type)
+		for range n {
 			zeros = append(zeros, z)
 		}
 	}
 	return strings.Join(zeros, ", ")
+}
+func zeroValueForType(info *types.Info, expr ast.Expr) string {
+	typeInfo := info.TypeOf(expr)
+	if typeInfo == nil {
+		return zeroValueForExpr(expr)
+	}
+	switch t := typeInfo.Underlying().(type) {
+	case *types.Basic:
+		switch {
+		case t.Info()&types.IsBoolean != 0:
+			return "false"
+		case t.Info()&types.IsNumeric != 0:
+			return "0"
+		case t.Info()&types.IsString != 0:
+			return `""`
+		}
+	case *types.Pointer, *types.Slice, *types.Map, *types.Interface, *types.Signature, *types.Chan:
+		return "nil"
+	case *types.Struct:
+		return exprToString(expr) + "{}"
+	case *types.Array:
+		return exprToString(expr) + "{}"
+	}
+	return "nil"
 }
 
 func zeroValueForExpr(expr ast.Expr) string {

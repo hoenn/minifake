@@ -32,7 +32,7 @@ func TestGolden(t *testing.T) {
 
 			interfaceNames := extractInterfaceNames(t, string(src))
 
-			got, err := ParseAndStubFromSrc(interfaceNames, string(src), true)
+			got, err := ParseAndStubFromFile(interfaceNames, inputPath+".go", true)
 			require.NoError(t, err)
 
 			expected, err := os.ReadFile(goldenPath)
@@ -62,18 +62,4 @@ func extractInterfaceNames(t *testing.T, src string) []string {
 	}
 	t.Fatal("no //go:generate go run github.com/hoenn/mimic directive found")
 	return nil
-}
-
-func TestCrossPackageEmbedError(t *testing.T) {
-	src := `package test
-
-import "io"
-
-type Outer interface {
-	io.Reader
-}
-`
-	_, err := ParseAndStubFromSrc([]string{"Outer"}, src, true)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cross-package embed")
 }
