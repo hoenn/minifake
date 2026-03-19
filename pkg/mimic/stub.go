@@ -261,7 +261,7 @@ func methodDataFromTypesInterface(pkg *types.Package, iface *types.Interface) []
 			Results:     sigResultsToString(pkg, sig),
 			ParamNames:  sigParamNamesToString(sig),
 			HasResults:  sig.Results().Len() > 0,
-			ZeroResults: sigZeroResultsToString(sig),
+			ZeroResults: sigZeroResultsToString(pkg, sig),
 		})
 	}
 	return methods
@@ -282,7 +282,7 @@ func sigParamsToString(pkg *types.Package, sig *types.Signature) string {
 			// Convert []T to ...T for the last param
 			slice, ok := p.Type().(*types.Slice)
 			if ok {
-				typeStr = "..." + types.TypeString(slice.Elem(), nil)
+				typeStr = "..." + types.TypeString(slice.Elem(), qualifier)
 			}
 		}
 		parts = append(parts, name+" "+typeStr)
@@ -330,19 +330,20 @@ func sigParamNamesToString(sig *types.Signature) string {
 	return strings.Join(names, ",")
 }
 
-func sigZeroResultsToString(sig *types.Signature) string {
+func sigZeroResultsToString(pkg *types.Package, sig *types.Signature) string {
 	results := sig.Results()
 	if results.Len() == 0 {
 		return ""
 	}
 	var zeros []string
-	for i := 0; i < results.Len(); i++ {
-		zeros = append(zeros, zeroValueForTypesType(results.At(i).Type()))
+	for i := range results.Len() {
+		zeros = append(zeros, zeroValueForTypesType(pkg, results.At(i).Type()))
 	}
 	return strings.Join(zeros, ", ")
 }
 
-func zeroValueForTypesType(typ types.Type) string {
+func zeroValueForTypesType(pkg *types.Package, typ types.Type) string {
+	qualifier := types.RelativeTo(pkg)
 	switch t := typ.Underlying().(type) {
 	case *types.Basic:
 		switch {
@@ -356,9 +357,9 @@ func zeroValueForTypesType(typ types.Type) string {
 	case *types.Pointer, *types.Slice, *types.Map, *types.Interface, *types.Signature, *types.Chan:
 		return "nil"
 	case *types.Struct:
-		return types.TypeString(typ, nil) + "{}"
+		return types.TypeString(typ, qualifier) + "{}"
 	case *types.Array:
-		return types.TypeString(typ, nil) + "{}"
+		return types.TypeString(typ, qualifier) + "{}"
 	}
 	return "nil"
 }
