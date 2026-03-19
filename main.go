@@ -38,8 +38,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	parts := strings.Split(filepath, filename)
-	fakeFilepath := path.Join(parts[0], fmt.Sprintf("%s_fake.go", strings.TrimSuffix(filename, ".go")))
+	dir := path.Dir(filepath)
+	fakeFilepath := path.Join(dir, fmt.Sprintf("%s_fake.go", strings.TrimSuffix(filename, ".go")))
 	fmt.Printf("Writing %s\n", fakeFilepath)
 	f, err := os.Create(fakeFilepath)
 	if err != nil {

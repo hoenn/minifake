@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/format"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"path/filepath"
@@ -58,18 +57,6 @@ type MethodData struct {
 type InterfaceData struct {
 	Name    string
 	Methods []*MethodData
-}
-
-// ParseAndStubFromSrc is primarily used for testing.
-func ParseAndStubFromSrc(interfaceNames []string, src string, formatted bool) ([]byte, error) {
-	fset := token.NewFileSet()
-	_, err := parser.ParseFile(fset, "", src, parser.ParseComments)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse src: %w", err)
-	}
-	return nil, nil
-
-	//return parseAndStub(interfaceNames, node, formatted)
 }
 
 // ParseAndStubFromFile is the main entry point for go generated use cases.
