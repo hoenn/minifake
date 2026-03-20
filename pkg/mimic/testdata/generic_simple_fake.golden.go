@@ -8,6 +8,8 @@ type FakeCache[T any] struct {
 	DeleteStub func(key string)
 }
 
+var _ Cache[any] = (*FakeCache[any])(nil)
+
 func (fakeImpl *FakeCache[T]) Get(key string) (T, bool) {
 	if fakeImpl.GetStub != nil {
 		return fakeImpl.GetStub(key)

@@ -7,6 +7,8 @@ type FakeExtendedCache[T any] struct {
 	WriteStub func(key string, value T)
 }
 
+var _ ExtendedCache[any] = (*FakeExtendedCache[any])(nil)
+
 func (fakeImpl *FakeExtendedCache[T]) Read(key string) (T, bool) {
 	if fakeImpl.ReadStub != nil {
 		return fakeImpl.ReadStub(key)

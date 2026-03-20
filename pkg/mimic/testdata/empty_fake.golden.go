@@ -4,3 +4,5 @@ package test
 // FakeEmpty implements Empty.
 type FakeEmpty struct {
 }
+
+var _ Empty = (*FakeEmpty)(nil)

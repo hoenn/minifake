@@ -30,6 +30,8 @@ type Fake{{$interfaceName}}{{$typeParamDecl}} struct {
 {{- end}}
 }
 
+{{.InterfaceAssertion}}
+
 {{- range .Methods}}
 func (fakeImpl *Fake{{$interfaceName}}{{$typeParamArgs}}) {{.MethodName}}({{.Params}}) {{.Results}} {
 	if fakeImpl.{{.MethodName}}Stub != nil {
@@ -95,6 +97,29 @@ func (i *InterfaceData) TypeParamArgs() string {
 		parts = append(parts, tp.Name)
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+var constraintDefaults = map[string]string{
+	"any":        "any",
+	"comparable": "int",
+}
+
+// InterfaceAssertion returns a compile-time interface assertion, or a comment
+// explaining why one could not be generated for unrecognized constraints.
+func (i *InterfaceData) InterfaceAssertion() string {
+	if len(i.TypeParams) == 0 {
+		return fmt.Sprintf("var _ %s = (*Fake%s)(nil)", i.Name, i.Name)
+	}
+	var concreteTypes []string
+	for _, tp := range i.TypeParams {
+		concrete, ok := constraintDefaults[tp.Constraint]
+		if !ok {
+			return fmt.Sprintf("// Could not generate compile-time interface assertion for Fake%s due to unrecognized constraint %q on type parameter %s.", i.Name, tp.Constraint, tp.Name)
+		}
+		concreteTypes = append(concreteTypes, concrete)
+	}
+	typeArgs := "[" + strings.Join(concreteTypes, ", ") + "]"
+	return fmt.Sprintf("var _ %s%s = (*Fake%s%s)(nil)", i.Name, typeArgs, i.Name, typeArgs)
 }
 
 type TypeParamData struct {

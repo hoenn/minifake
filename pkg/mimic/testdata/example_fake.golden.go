@@ -8,6 +8,8 @@ type FakeJobQueuer struct {
 	QueueStub   func() []*Job
 }
 
+var _ JobQueuer = (*FakeJobQueuer)(nil)
+
 func (fakeImpl *FakeJobQueuer) Enqueue(j *Job) error {
 	if fakeImpl.EnqueueStub != nil {
 		return fakeImpl.EnqueueStub(j)
@@ -34,6 +36,8 @@ type FakeJobList struct {
 	GetStub     func(arg0 jobName) *Job
 	RefreshStub func()
 }
+
+var _ JobList = (*FakeJobList)(nil)
 
 func (fakeImpl *FakeJobList) Append(j *Job) error {
 	if fakeImpl.AppendStub != nil {
@@ -71,6 +75,8 @@ type FakeJobServer struct {
 	PrintStub   func() error
 	HealthStub  func() (bool, error)
 }
+
+var _ JobServer = (*FakeJobServer)(nil)
 
 func (fakeImpl *FakeJobServer) Append(j *Job) error {
 	if fakeImpl.AppendStub != nil {

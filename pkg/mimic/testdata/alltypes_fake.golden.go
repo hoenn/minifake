@@ -37,6 +37,8 @@ type FakeAllTypes struct {
 	AnonymousStructMethodStub     func(arg0 struct{ X int }) struct{ X int }
 }
 
+var _ AllTypes = (*FakeAllTypes)(nil)
+
 func (fakeImpl *FakeAllTypes) BoolMethod(b bool) bool {
 	if fakeImpl.BoolMethodStub != nil {
 		return fakeImpl.BoolMethodStub(b)

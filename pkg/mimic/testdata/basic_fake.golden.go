@@ -10,6 +10,8 @@ type FakeBasic struct {
 	AbcStub func(t *testing.T) error
 }
 
+var _ Basic = (*FakeBasic)(nil)
+
 func (fakeImpl *FakeBasic) Foo() error {
 	if fakeImpl.FooStub != nil {
 		return fakeImpl.FooStub()

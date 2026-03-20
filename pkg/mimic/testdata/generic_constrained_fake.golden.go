@@ -8,6 +8,8 @@ type FakeSorter[T comparable] struct {
 	MinStub      func(items []T) T
 }
 
+var _ Sorter[int] = (*FakeSorter[int])(nil)
+
 func (fakeImpl *FakeSorter[T]) Sort(items []T) []T {
 	if fakeImpl.SortStub != nil {
 		return fakeImpl.SortStub(items)
@@ -34,6 +36,8 @@ type FakeKeyValue[K comparable, V any] struct {
 	SetStub  func(key K, value V)
 	KeysStub func() []K
 }
+
+var _ KeyValue[int, any] = (*FakeKeyValue[int, any])(nil)
 
 func (fakeImpl *FakeKeyValue[K, V]) Get(key K) (V, bool) {
 	if fakeImpl.GetStub != nil {

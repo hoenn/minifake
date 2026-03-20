@@ -9,6 +9,8 @@ type FakeCrossPackageEmbed struct {
 	DoStub   func(ctx context.Context) error
 }
 
+var _ CrossPackageEmbed = (*FakeCrossPackageEmbed)(nil)
+
 func (fakeImpl *FakeCrossPackageEmbed) Read(p []byte) (n int, err error) {
 	if fakeImpl.ReadStub != nil {
 		return fakeImpl.ReadStub(p)

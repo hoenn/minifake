@@ -15,7 +15,7 @@ func TestGolden(t *testing.T) {
 
 	var inputs []string
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") && !strings.HasSuffix(e.Name(), ".go.golden") {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") && !strings.HasSuffix(e.Name(), ".golden.go") {
 			inputs = append(inputs, e.Name())
 		}
 	}
@@ -25,7 +25,7 @@ func TestGolden(t *testing.T) {
 		t.Run(fileName, func(t *testing.T) {
 			t.Parallel()
 			inputPath := filepath.Join("testdata", fileName)
-			goldenPath := inputPath + "_fake.go.golden"
+			goldenPath := inputPath + "_fake.golden.go"
 
 			src, err := os.ReadFile(inputPath + ".go")
 			require.NoError(t, err)

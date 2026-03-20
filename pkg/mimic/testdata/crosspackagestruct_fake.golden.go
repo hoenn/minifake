@@ -13,6 +13,8 @@ type FakeCrossPackageStruct struct {
 	ColorModelStub func() color.Model
 }
 
+var _ CrossPackageStruct = (*FakeCrossPackageStruct)(nil)
+
 func (fakeImpl *FakeCrossPackageStruct) At(x int, y int) color.Color {
 	if fakeImpl.AtStub != nil {
 		return fakeImpl.AtStub(x, y)

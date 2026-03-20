@@ -8,6 +8,8 @@ type FakeInterfaceA struct {
 	QuxStub func() string
 }
 
+var _ InterfaceA = (*FakeInterfaceA)(nil)
+
 func (fakeImpl *FakeInterfaceA) Foo() string {
 	if fakeImpl.FooStub != nil {
 		return fakeImpl.FooStub()
@@ -33,6 +35,8 @@ type FakeInterfaceB struct {
 	QuxStub func() string
 }
 
+var _ InterfaceB = (*FakeInterfaceB)(nil)
+
 func (fakeImpl *FakeInterfaceB) Bar() string {
 	if fakeImpl.BarStub != nil {
 		return fakeImpl.BarStub()
@@ -50,6 +54,8 @@ func (fakeImpl *FakeInterfaceB) Qux() string {
 type FakeInterfaceC struct {
 	QuxStub func() string
 }
+
+var _ InterfaceC = (*FakeInterfaceC)(nil)
 
 func (fakeImpl *FakeInterfaceC) Qux() string {
 	if fakeImpl.QuxStub != nil {

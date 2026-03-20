@@ -7,6 +7,8 @@ type FakeConverter[From, To any] struct {
 	ConvertAllStub func(inputs []From) ([]To, error)
 }
 
+var _ Converter[any, any] = (*FakeConverter[any, any])(nil)
+
 func (fakeImpl *FakeConverter[From, To]) Convert(input From) (To, error) {
 	if fakeImpl.ConvertStub != nil {
 		return fakeImpl.ConvertStub(input)
@@ -26,6 +28,8 @@ type FakeSwapper[From, To any] struct {
 	SwapStub func(a From, b To) (To, From)
 	PtrStub  func(input From) *To
 }
+
+var _ Swapper[any, any] = (*FakeSwapper[any, any])(nil)
 
 func (fakeImpl *FakeSwapper[From, To]) Swap(a From, b To) (To, From) {
 	if fakeImpl.SwapStub != nil {
