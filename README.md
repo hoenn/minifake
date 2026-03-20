@@ -42,7 +42,7 @@ package foo
 | Cross-package interface and parameter embeds (`io.Reader`) | Yes | Handled |
 | Diamond embedding dedup | No | Will generate duplicate fields |
 | Overlapping method dedup (Go 1.14+) | No | Same issue |
-| Generic interfaces (`T[K]`) | No | Not handled |
+| Generic interfaces (`T[K]`) | Yes | Type params + constraints preserved |
 | Type constraint unions (`~int \| string`) | No | Not handled |
 
 ### Same-package generation

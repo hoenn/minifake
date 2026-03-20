@@ -21,15 +21,17 @@ package {{.PackageName}}
 
 {{- range .Interfaces}}
 {{- $interfaceName := .Name}}
+{{- $typeParamDecl := .FullTypeParamDecl}}
+{{- $typeParamArgs := .TypeParamArgs}}
 // Fake{{$interfaceName}} implements {{$interfaceName}}.
-type Fake{{$interfaceName}} struct {
+type Fake{{$interfaceName}}{{$typeParamDecl}} struct {
 {{- range .Methods}}
     {{.MethodName}}Stub func({{.Params}}) {{.Results}}
 {{- end}}
 }
 
 {{- range .Methods}}
-func (fakeImpl *Fake{{$interfaceName}}) {{.MethodName}}({{.Params}}) {{.Results}} {
+func (fakeImpl *Fake{{$interfaceName}}{{$typeParamArgs}}) {{.MethodName}}({{.Params}}) {{.Results}} {
 	if fakeImpl.{{.MethodName}}Stub != nil {
 {{- if .HasResults}}
 		return fakeImpl.{{.MethodName}}Stub({{.ParamNames}})
@@ -37,6 +39,9 @@ func (fakeImpl *Fake{{$interfaceName}}) {{.MethodName}}({{.Params}}) {{.Results}
 		fakeImpl.{{.MethodName}}Stub({{.ParamNames}})
 {{- end}}
 	}
+{{- if .ZeroDecls}}
+	{{.ZeroDecls}}
+{{- end}}
 {{- if .HasResults}}
 	return {{.ZeroResults}}
 {{- end}}
@@ -50,13 +55,51 @@ type MethodData struct {
 	Params      string
 	Results     string
 	HasResults  bool
+	ZeroDecls   string
 	ZeroResults string
 	ParamNames  string
 }
 
 type InterfaceData struct {
-	Name    string
-	Methods []*MethodData
+	Name       string
+	Methods    []*MethodData
+	TypeParams []*TypeParamData
+}
+
+func (i *InterfaceData) FullTypeParamDecl() string {
+	if len(i.TypeParams) == 0 {
+		return ""
+	}
+	// Group consecutive type params sharing the same constraint: [From, To any]
+	var parts []string
+	var names []string
+	currentConstraint := i.TypeParams[0].Constraint
+	for _, tp := range i.TypeParams {
+		if tp.Constraint != currentConstraint {
+			parts = append(parts, strings.Join(names, ", ")+" "+currentConstraint)
+			names = nil
+			currentConstraint = tp.Constraint
+		}
+		names = append(names, tp.Name)
+	}
+	parts = append(parts, strings.Join(names, ", ")+" "+currentConstraint)
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+func (i *InterfaceData) TypeParamArgs() string {
+	if len(i.TypeParams) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, tp := range i.TypeParams {
+		parts = append(parts, tp.Name)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+type TypeParamData struct {
+	Name       string
+	Constraint string
 }
 
 // ParseAndStubFromFile is the main entry point for go generated use cases.
@@ -123,6 +166,8 @@ func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, pkg
 			if !slices.Contains(interfaceNames, interfaceName) {
 				continue
 			}
+
+			typeParams := extractTypeParams(typeSpec.TypeParams)
 			var methods []*MethodData
 			for _, m := range interfaceType.Methods.List {
 				if len(m.Names) == 0 { // Embedded interface
@@ -141,12 +186,14 @@ func parseAndStub(interfaceNames []string, node *ast.File, info *types.Info, pkg
 					Results:     resultsToString(m.Type.(*ast.FuncType).Results),
 					ParamNames:  paramNamesToString(m.Type.(*ast.FuncType).Params),
 					HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
+					ZeroDecls:   zeroDeclsToString(info, funcType.Results),
 					ZeroResults: zeroResultsToString(info, funcType.Results),
 				})
 			}
 			interfaces = append(interfaces, &InterfaceData{
-				Name:    interfaceName,
-				Methods: methods,
+				Name:       interfaceName,
+				Methods:    methods,
+				TypeParams: typeParams,
 			})
 		}
 	}
@@ -237,6 +284,7 @@ func resolveLocalEmbeddedMethods(iface *ast.InterfaceType, info *types.Info, pkg
 				Results:     resultsToString(funcType.Results),
 				ParamNames:  paramNamesToString(funcType.Params),
 				HasResults:  funcType.Results != nil && len(funcType.Results.List) > 0,
+				ZeroDecls:   zeroDeclsToString(info, funcType.Results),
 				ZeroResults: zeroResultsToString(info, funcType.Results),
 			})
 			continue
@@ -261,6 +309,7 @@ func methodDataFromTypesInterface(pkg *types.Package, iface *types.Interface) []
 			Results:     sigResultsToString(pkg, sig),
 			ParamNames:  sigParamNamesToString(sig),
 			HasResults:  sig.Results().Len() > 0,
+			ZeroDecls:   sigZeroDeclsToString(sig),
 			ZeroResults: sigZeroResultsToString(pkg, sig),
 		})
 	}
@@ -342,6 +391,28 @@ func sigZeroResultsToString(pkg *types.Package, sig *types.Signature) string {
 	return strings.Join(zeros, ", ")
 }
 
+func sigZeroDeclsToString(sig *types.Signature) string {
+	results := sig.Results()
+	if results.Len() == 0 {
+		return ""
+	}
+	seen := map[string]bool{}
+	var decls []string
+	for i := range results.Len() {
+		tp, ok := results.At(i).Type().(*types.TypeParam)
+		if !ok {
+			continue
+		}
+		name := tp.Obj().Name()
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		decls = append(decls, fmt.Sprintf("var zero%s %s", name, name))
+	}
+	return strings.Join(decls, "\n\t")
+}
+
 func localQualifier(local *types.Package) types.Qualifier {
 	return func(pkg *types.Package) string {
 		if pkg == local {
@@ -352,6 +423,9 @@ func localQualifier(local *types.Package) types.Qualifier {
 }
 
 func zeroValueForTypesType(pkg *types.Package, typ types.Type) string {
+	if tp, ok := typ.(*types.TypeParam); ok {
+		return "zero" + tp.Obj().Name()
+	}
 	qualifier := localQualifier(pkg)
 	switch t := typ.Underlying().(type) {
 	case *types.Basic:
@@ -391,6 +465,25 @@ func paramsToString(fields *ast.FieldList) string {
 	}
 
 	return strings.Join(params, ", ")
+}
+
+func extractTypeParams(fields *ast.FieldList) []*TypeParamData {
+	if fields == nil {
+		return nil
+	}
+
+	var params []*TypeParamData
+	for _, field := range fields.List {
+		constraint := exprToString(field.Type)
+		for _, name := range field.Names {
+			params = append(params, &TypeParamData{
+				Name:       name.Name,
+				Constraint: constraint,
+			})
+		}
+	}
+
+	return params
 }
 
 func resultsToString(fields *ast.FieldList) string {
@@ -467,10 +560,40 @@ func zeroResultsToString(info *types.Info, results *ast.FieldList) string {
 	}
 	return strings.Join(zeros, ", ")
 }
+
+func zeroDeclsToString(info *types.Info, results *ast.FieldList) string {
+	if results == nil || len(results.List) == 0 {
+		return ""
+	}
+
+	seen := map[string]bool{}
+	var decls []string
+	for _, field := range results.List {
+		typeInfo := info.TypeOf(field.Type)
+		if typeInfo == nil {
+			continue
+		}
+		tp, ok := typeInfo.(*types.TypeParam)
+		if !ok {
+			continue
+		}
+		name := tp.Obj().Name()
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		decls = append(decls, fmt.Sprintf("var zero%s %s", name, name))
+	}
+	return strings.Join(decls, "\n\t")
+}
+
 func zeroValueForType(info *types.Info, expr ast.Expr) string {
 	typeInfo := info.TypeOf(expr)
 	if typeInfo == nil {
 		return zeroValueForExpr(expr)
+	}
+	if tp, ok := typeInfo.(*types.TypeParam); ok {
+		return "zero" + tp.Obj().Name()
 	}
 	switch t := typeInfo.Underlying().(type) {
 	case *types.Basic:
