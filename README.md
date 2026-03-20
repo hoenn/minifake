@@ -40,9 +40,11 @@ package foo
 | Transitive embeds (A→B→C) | Yes | Recursive |
 | Mixed embeds + methods | Yes | Both collected |
 | Cross-package interface and parameter embeds (`io.Reader`) | Yes | Handled |
+| Compile time interface assertions | Yes | Presented after struct definition |
+| Compile time interface assertions for generics | Yes* | Leaves a comment instead for unsupported complex type constraints |
+| Generic interfaces (`T[K]`) | Yes | Type params + constraints preserved |
 | Diamond embedding dedup | No | Will generate duplicate fields |
 | Overlapping method dedup (Go 1.14+) | No | Same issue |
-| Generic interfaces (`T[K]`) | Yes | Type params + constraints preserved |
 | Type constraint unions (`~int \| string`) | No | Not handled |
 
 ### Same-package generation
