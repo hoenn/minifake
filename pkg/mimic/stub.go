@@ -410,7 +410,7 @@ func sigZeroDeclsToString(sig *types.Signature) string {
 		seen[name] = true
 		decls = append(decls, fmt.Sprintf("var zero%s %s", name, name))
 	}
-	return strings.Join(decls, "\n\t")
+	return strings.Join(decls, "\n")
 }
 
 func localQualifier(local *types.Package) types.Qualifier {
@@ -584,7 +584,7 @@ func zeroDeclsToString(info *types.Info, results *ast.FieldList) string {
 		seen[name] = true
 		decls = append(decls, fmt.Sprintf("var zero%s %s", name, name))
 	}
-	return strings.Join(decls, "\n\t")
+	return strings.Join(decls, "\n")
 }
 
 func zeroValueForType(info *types.Info, expr ast.Expr) string {
