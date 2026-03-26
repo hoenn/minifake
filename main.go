@@ -25,6 +25,10 @@ func main() {
 	} else {
 		interfaceNamesStr = os.Args[1]
 	}
+	if filepath == "" {
+		fmt.Println("Provided filepath is empty")
+		os.Exit(1)
+	}
 	interfaceNames := strings.Split(interfaceNamesStr, ",")
 	filename := path.Base(filepath)
 	fmt.Printf("Generating fakes for %v from %s\n", interfaceNames, filename)
@@ -44,18 +48,19 @@ func main() {
 	f, err := os.Create(fakeFilepath)
 	if err != nil {
 		fmt.Printf("Unable to open %s for writing: %s\n", fakeFilepath, err.Error())
-		os.Exit(1)
+		return
 	}
 	defer func() {
 		err := f.Close()
 		if err != nil {
-			fmt.Printf("Unable to close %s: %v", fakeFilepath, err)
+			fmt.Printf("Unable to close %s: %v\n", fakeFilepath, err)
+			os.Exit(1)
 		}
 	}()
 
 	_, err = f.Write(bs)
 	if err != nil {
 		fmt.Println("Unable to write fake:", err)
-		os.Exit(1)
+		return
 	}
 }
