@@ -130,7 +130,7 @@ type TypeParamData struct {
 // ParseAndStubFromFile is the main entry point for go generated use cases.
 func ParseAndStubFromFile(interfaceNames []string, filePath string, formatted bool) ([]byte, error) {
 	cfg := &packages.Config{
-		Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedName,
+		Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedName | packages.NeedImports | packages.NeedDeps,
 	}
 
 	filePath, err := filepath.Abs(filePath)
